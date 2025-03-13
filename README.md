@@ -1,6 +1,6 @@
 # LinkedIn Insights Microservice
 
-This repository contains a microservice that retrieves and analyzes LinkedIn page data. It uses FastAPI, MongoDB, Redis, and an AI service to generate summaries.
+This repository contains a microservice that retrieves and analyzes LinkedIn page data. It uses FastAPI, MongoDB, Redis, and an AI service(Mistral.ai API ) to generate summaries.
 
 ## Table of Contents
 
