@@ -7,6 +7,7 @@ from scraper import linkedin_scraper
 from typing import Optional, List
 import redis
 from ai_summary import generate_company_summary
+
 app = FastAPI(title="Linkedin insights microservice")
 
 redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
@@ -16,27 +17,25 @@ CACHE_EXPIRE_SECONDS = 360
 @app.get('/pages/{page_id}', response_model=Page)
 async def get_page(page_id: str):
     cache_key = f"page:{page_id}"
- 
     cached_page = redis_client.get(cache_key)
     if cached_page:
         print("cache hit")
         return json.loads(cached_page)
-
+    
     page = pages_collection.find_one({"page_id": page_id})
     if page is not None:
         page.pop("_id", None)
-  
-        redis_client.setex(cache_key, CACHE_EXPIRE_SECONDS, json.dumps(page))
+        redis_client.setex(cache_key, CACHE_EXPIRE_SECONDS, json.dumps(page, default=str))
         return page
-
 
     try:
         page_data = linkedin_scraper(page_id)
         if page_data:
             pages_collection.insert_one(page_data)
-          
-            redis_client.setex(cache_key, CACHE_EXPIRE_SECONDS, json.dumps(page_data))
+            redis_client.setex(cache_key, CACHE_EXPIRE_SECONDS, json.dumps(page_data, default=str))
             return page_data
+        else:
+            raise HTTPException(status_code=404, detail="Page not found")
     except Exception as e:
         if "Page not found" in str(e):
             raise HTTPException(status_code=404, detail="Page not found")
@@ -82,12 +81,9 @@ async def find_pages(
         pages.append(page)
     return pages
 
-
-
 @app.get('/ai-summary/{page_id}')
 async def ai_summary(page_id: str):
     cache_key = f"ai-summary:{page_id}"
-
     cached_summary = redis_client.get(cache_key)
     if cached_summary:
         return json.loads(cached_summary)
@@ -95,12 +91,11 @@ async def ai_summary(page_id: str):
     company_data = pages_collection.find_one({"page_id": page_id})
     if not company_data:
         raise HTTPException(status_code=404, detail="Page not found")
-
     company_data.pop("_id", None)
     
     try:
         summary_response = generate_company_summary(company_data)
-        redis_client.setex(cache_key, CACHE_EXPIRE_SECONDS, json.dumps(summary_response))
+        redis_client.setex(cache_key, CACHE_EXPIRE_SECONDS, json.dumps(summary_response, default=str))
         return summary_response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Summary generation failed: {str(e)}")
