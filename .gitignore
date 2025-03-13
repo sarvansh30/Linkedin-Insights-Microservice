@@ -1,0 +1,6 @@
+server/__pycache__/
+*.py[cod]
+*.pyo
+
+myenv/
+server/.env
